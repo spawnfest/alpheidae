@@ -1,5 +1,6 @@
 defmodule MumbleProtocol do
   use Protobuf, from: Path.expand("../proto/mumble.proto", __DIR__)
+  use Bitwise
 
   @message_types [
     MumbleProtocol.Version,
@@ -32,7 +33,7 @@ defmodule MumbleProtocol do
 
   defmodule VoicePacket do
     @moduledoc false
-    defstruct []
+    defstruct [:data, :target, :type]
   end
 
   @doc """
@@ -56,7 +57,10 @@ defmodule MumbleProtocol do
 
   # Handle the voice packets differently than the regular ones
   defp decode_one(1, data) do
-    %MumbleProtocol.VoicePacket{}
+    <<header :: signed-big-integer-size(8), _ :: binary>> = data
+    target = band(0b00011111, header)
+    type = band(0b11100000, header)
+    %MumbleProtocol.VoicePacket{data: data, target: target, type: type}
   end
 
   defp decode_one(type, data) do
@@ -68,7 +72,7 @@ defmodule MumbleProtocol do
   """
   # Hande voice differently
   def encode(%MumbleProtocol.VoicePacket{} = struct) do
-    <<>>
+    <<1 :: signed-big-integer-size(16), byte_size(struct.data) :: signed-big-integer-size(32)>> <> struct.data
   end
 
   def encode(struct) do
