@@ -18,8 +18,8 @@ defmodule Alpheidae.Protocol do
   """
   def init(ref, socket, transport) do
     :ok = :ranch.accept_ack(ref)
-    :ok = Alpheidae.VoiceServer.start_monitor()
 
+    send_version(socket, transport)
     transport.setopts(socket, [active: :once])
     loop(socket, transport, <<>>)
   end
@@ -32,13 +32,13 @@ defmodule Alpheidae.Protocol do
         transport.setopts(socket, [active: :once])
         loop(socket, transport, next_data)
       {:ssl_closed, ^socket} ->
-        :ok
+        Alpheidae.ClientRegistry.deregister(self())
       {:message, message} ->
         packet = MumbleProtocol.encode(message)
         transport.send(socket, packet)
         loop(socket, transport, old_data)
       any ->
-        IO.puts("Got unhandled message #{inspect any, pretty: true}")
+        Logger.debug("Got unhandled message #{inspect any, pretty: true}")
         loop(socket, transport, old_data)
     end
   end
@@ -57,5 +57,14 @@ defmodule Alpheidae.Protocol do
           :ok
       end
     end
+  end
+
+  defp send_version(socket, transport) do
+    version = MumbleProtocol.Version.new(
+      version: 66067
+    )
+
+    packet = MumbleProtocol.encode(version)
+    transport.send(socket, packet)
   end
 end
