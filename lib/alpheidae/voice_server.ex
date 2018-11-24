@@ -25,7 +25,7 @@ defmodule Alpheidae.VoiceServer do
   end
 
   def handle_info(_, state) do
-    {:noreply, state}
+    {:reply, :ok, state}
   end
 
   def handle_call({:dispatch, %MumbleProtocol.Authenticate{} = auth}, {from_pid, _from_ref}, state) do
@@ -59,6 +59,12 @@ defmodule Alpheidae.VoiceServer do
 
   def handle_call({:dispatch, %MumbleProtocol.UserState{} = user_state}, _, state) do
     {:reply, [user_state], state}
+  end
+
+  def handle_call({:dispatch, %MumbleProtocol.VoicePacket{} = packet}, {from_pid, _from_self}, state) do
+    Logger.debug("#{inspect packet}")
+    Client.broadcast(from_pid, packet, false)
+    {:reply, [], state}
   end
 
   def handle_call({:dispatch, message}, {from_pid, _from_ref}, state) do

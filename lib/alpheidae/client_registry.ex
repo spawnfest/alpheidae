@@ -109,7 +109,7 @@ defmodule Alpheidae.ClientRegistry do
 
     :ets.insert(__MODULE__, {client_pid, user})
     user_state = client_to_user_state(user)
-    broadcast_message(client_pid, user_state, false)
+    broadcast_message(client_pid, user_state)
 
     {:reply, {:ok, crypt_setup}, state}
   end
@@ -118,8 +118,8 @@ defmodule Alpheidae.ClientRegistry do
     [{^client_pid, client}] = :ets.lookup(__MODULE__, client_pid)
     :ets.delete(__MODULE__, client_pid)
     remove_msg = MumbleProtocol.UserRemove.new(session: client.session)
-    broadcast_message(client_pid, remove_msg, false)
-    {:noreply, state}
+    broadcast_message(client_pid, remove_msg)
+    {:reply, :ok, state}
   end
 
   def handle_call({:record_ping, client_pid, ping_message}, _, state) do
@@ -159,12 +159,12 @@ defmodule Alpheidae.ClientRegistry do
   end
 
   def handle_call({:broadcast, client_pid, message, include_self}, _, state) do
-    broadcast_message(client_pid, message, include_self)
-    {:noreply, state}
+    broadcast_message(client_pid, message)
+    {:reply, :ok, state}
   end
 
   def handle_call(_, _, state) do
-    {:noreply, state}
+    {:reply, :ok, state}
   end
 
   defp client_to_user_state(client) do
@@ -175,16 +175,8 @@ defmodule Alpheidae.ClientRegistry do
     )
   end
 
-  defp broadcast_message(client_pid, message, include_self) do
-    fun = fn {pid, _}, acc ->
-      cond do
-        client_pid == pid and include_self == false ->
-          acc
-        true ->
-          [pid] ++ acc
-      end
-    end
-
+  defp broadcast_message(client_pid, message) do
+    fun = fn ({pid, _}, acc) -> if (client_pid == pid), do: acc, else: [pid] ++ acc end
     pids = :ets.foldl(fun, [], __MODULE__)
     for pid <- pids, do: send(pid, {:message, message})
   end
