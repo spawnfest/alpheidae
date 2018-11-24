@@ -30,6 +30,11 @@ defmodule MumbleProtocol do
     MumbleProtocol.SuggestConfig
   ]
 
+  defmodule VoicePacket do
+    @moduledoc false
+    defstruct []
+  end
+
   @doc """
   Extracts and parses any protobuf messages in the given binary,
   returning a list of the decoded messages and all of the unprocessed
@@ -49,6 +54,11 @@ defmodule MumbleProtocol do
     {Enum.reverse(msgs), data}
   end
 
+  # Handle the voice packets differently than the regular ones
+  defp decode_one(1, data) do
+    %MumbleProtocol.VoicePacket{}
+  end
+
   defp decode_one(type, data) do
     Enum.fetch!(@message_types, type).decode(data)
   end
@@ -56,6 +66,11 @@ defmodule MumbleProtocol do
   @doc """
   Encodes a struct as binary with the approprate header for the mumble client
   """
+  # Hande voice differently
+  def encode(%MumbleProtocol.VoicePacket{} = struct) do
+    <<>>
+  end
+
   def encode(struct) do
     type = struct.__struct__
     type_number = Enum.find_index(@message_types, fn a -> a == type end)

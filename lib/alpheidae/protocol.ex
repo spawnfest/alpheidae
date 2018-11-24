@@ -1,13 +1,13 @@
 defmodule Alpheidae.Protocol do
+  require Logger
+
   @behaviour :ranch_protocol
 
   @moduledoc """
   Alpheidae.Protocol implements a ranch protocol translating Mumble's wire protocol
   into usable messages.
   """
-
   def start_link(ref, socket, transport, _opts) do
-    IO.puts("spawn")
     pid = spawn_link(__MODULE__, :init, [ref, socket, transport])
     {:ok, pid}
   end
@@ -18,6 +18,7 @@ defmodule Alpheidae.Protocol do
   """
   def init(ref, socket, transport) do
     :ok = :ranch.accept_ack(ref)
+    :ok = Alpheidae.VoiceServer.start_monitor()
 
     transport.setopts(socket, [active: :once])
     loop(socket, transport, <<>>)
@@ -31,7 +32,11 @@ defmodule Alpheidae.Protocol do
         transport.setopts(socket, [active: :once])
         loop(socket, transport, next_data)
       {:ssl_closed, ^socket} ->
-        IO.puts("Socket closed")
+        :ok
+      {:message, message} ->
+        packet = MumbleProtocol.encode(message)
+        transport.send(socket, packet)
+        loop(socket, transport, old_data)
       any ->
         IO.puts("Got unhandled message #{inspect any, pretty: true}")
         loop(socket, transport, old_data)
@@ -39,6 +44,18 @@ defmodule Alpheidae.Protocol do
   end
 
   defp handle_message(socket, transport, message) do
-    IO.puts("Got Message: #{inspect message}")
+    replies = Alpheidae.VoiceServer.dispatch(message)
+
+    for reply <- replies do
+      packet = MumbleProtocol.encode(reply)
+      transport.send(socket, packet)
+
+      case reply do
+        %MumbleProtocol.Reject{} ->
+          :ok = transport.close(socket)
+        _any ->
+          :ok
+      end
+    end
   end
 end
