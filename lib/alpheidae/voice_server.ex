@@ -92,6 +92,14 @@ defmodule Alpheidae.VoiceServer do
     {:reply, [], state}
   end
 
+  def handle_call({:dispatch, %MumbleProtocol.TextMessage{} = text_message}, {from_pid, _from_self}, state) do
+    IO.inspect(text_message)
+    #session = Client.session_for(from_pid)
+    #msg = %{text_message| session: session}
+    Client.broadcast_to_channel(from_pid, text_message)
+    {:reply, [], state}
+  end
+
   def handle_call({:dispatch, message}, {from_pid, _from_ref}, state) do
     Logger.debug("Unknown Message from `#{inspect from_pid}`: #{inspect message}")
     reply = MumbleProtocol.Reject.new(type: 0, reason: "Unknown Message")
