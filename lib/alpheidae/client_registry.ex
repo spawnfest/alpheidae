@@ -212,9 +212,12 @@ defmodule Alpheidae.ClientRegistry do
         broadcast_message(client_pid, user_state)
         send(client_pid, {:message, base_state})
       true ->
-        [target] = client_by_session(message.session)
-        denial = client_to_user_state(target)
-        send(client_pid, {:message, denial})
+        case client_by_session(message.session) do
+          [target] ->
+            denial = client_to_user_state(target)
+            send(client_pid, {:message, denial})
+          _ -> :noop
+        end
     end
 
     {:reply, :ok, state}
