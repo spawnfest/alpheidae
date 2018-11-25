@@ -13,12 +13,6 @@ defmodule Alpheidae.ChannelRegistry do
     ]
   end
 
-  #root_channel = MumbleProtocol.ChannelState.new(
-    #  channel_id: 0,
-    #  name: "Tmp Root Ch"
-    #)
-
-
   defmodule State do
     @moduledoc false
     defstruct []
