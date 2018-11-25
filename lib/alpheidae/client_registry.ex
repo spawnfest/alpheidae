@@ -166,12 +166,10 @@ defmodule Alpheidae.ClientRegistry do
   def handle_call({:server_sync, client_pid}, _, state) do
     [{^client_pid, client}] = :ets.lookup(__MODULE__, client_pid)
 
-    # TODO: pull max bandwith and welcome text
-    # from application config
     sync = MumbleProtocol.ServerSync.new(
       session: client.session,
-      max_bandwith: 8192,
-      welcome_text: "Hello",
+      max_bandwith: Application.get_env(:alpheidae, :max_bandwith),
+      welcome_text: Application.get_env(:alpheidae, :welcome_text),
       permissions: client.permissions
     )
 
