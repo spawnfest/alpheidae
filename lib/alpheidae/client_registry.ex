@@ -198,13 +198,24 @@ defmodule Alpheidae.ClientRegistry do
       channel_id: message.channel_id
     }
 
-    new_client = Map.merge(client, allowed_updates, fn _, v1, v2 -> if v2 == nil, do: v1, else: v2 end)
-    :ets.insert(__MODULE__, {client_pid, new_client})
+    new_client = Map.merge(
+      client,
+      allowed_updates,
+      fn _, v1, v2 -> if v2 == nil, do: v1, else: v2 end
+    )
 
-    base_state = client_to_user_state(new_client)
-    user_state = %{base_state| actor: new_client.session}
-    broadcast_message(client_pid, user_state)
-    send(client_pid, {:message, message})
+    cond do
+      message.session == client.session ->
+        :ets.insert(__MODULE__, {client_pid, new_client})
+        base_state = client_to_user_state(new_client)
+        user_state = %{base_state| actor: client.session}
+        broadcast_message(client_pid, user_state)
+        send(client_pid, {:message, base_state})
+      true ->
+        [target] = client_by_session(message.session)
+        denial = client_to_user_state(target)
+        send(client_pid, {:message, denial})
+    end
 
     {:reply, :ok, state}
   end
@@ -227,5 +238,10 @@ defmodule Alpheidae.ClientRegistry do
     fun = fn ({pid, _}, acc) -> if (client_pid == pid), do: acc, else: [pid] ++ acc end
     pids = :ets.foldl(fun, [], __MODULE__)
     for pid <- pids, do: send(pid, {:message, message})
+  end
+
+  defp client_by_session(session) do
+    fun = fn ({_, c}, acc) -> if (c.session == session), do: [c] ++ acc, else: acc end
+    :ets.foldl(fun, [], __MODULE__)
   end
 end
