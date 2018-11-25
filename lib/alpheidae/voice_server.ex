@@ -29,7 +29,11 @@ defmodule Alpheidae.VoiceServer do
     {:reply, :ok, state}
   end
 
-  def handle_call({:dispatch, %MumbleProtocol.Authenticate{} = auth}, {from_pid, _from_ref}, state) do
+  def handle_call(
+        {:dispatch, %MumbleProtocol.Authenticate{} = auth},
+        {from_pid, _from_ref},
+        state
+      ) do
     {:ok, crypt_setup} = Client.register_session(from_pid, auth)
 
     channels = Channel.all_channels()
@@ -55,12 +59,20 @@ defmodule Alpheidae.VoiceServer do
     {:reply, [server_ping], state}
   end
 
-  def handle_call({:dispatch, %MumbleProtocol.UserState{} = user_state}, {from_pid, _from_ref}, state) do
+  def handle_call(
+        {:dispatch, %MumbleProtocol.UserState{} = user_state},
+        {from_pid, _from_ref},
+        state
+      ) do
     Client.update_client_state(from_pid, user_state)
     {:reply, [user_state], state}
   end
 
-  def handle_call({:dispatch, %MumbleProtocol.VoicePacket{} = client_output}, {from_pid, _from_self}, state) do
+  def handle_call(
+        {:dispatch, %MumbleProtocol.VoicePacket{} = client_output},
+        {from_pid, _from_self},
+        state
+      ) do
     session = Client.session_for(from_pid)
     client_input = %{client_output | session: session}
     Client.broadcast_to_channel(from_pid, client_input)
@@ -92,16 +104,38 @@ defmodule Alpheidae.VoiceServer do
     {:reply, [], state}
   end
 
-  def handle_call({:dispatch, %MumbleProtocol.TextMessage{} = text_message}, {from_pid, _from_self}, state) do
-    IO.inspect(text_message)
-    #session = Client.session_for(from_pid)
-    #msg = %{text_message| session: session}
-    Client.broadcast_to_channel(from_pid, text_message)
+  def handle_call(
+        {:dispatch,
+         %MumbleProtocol.TextMessage{channel_id: target_channels, session: []} = text_message},
+        {from_pid, _from_self},
+        state
+      )
+      when is_list(target_channels) and length(target_channels) > 0 do
+    session = Client.session_for(from_pid)
+    msg = %{text_message | actor: session}
+    Client.broadcast_to_channel(from_pid, msg)
+    {:reply, [], state}
+  end
+
+  def handle_call(
+        {:dispatch,
+         %MumbleProtocol.TextMessage{channel_id: [], session: target_sessions} = text_message},
+        {from_pid, _from_self},
+        state
+      )
+      when is_list(target_sessions) and length(target_sessions) > 0 do
+    session = Client.session_for(from_pid)
+    msg = %{text_message | actor: session}
+    Client.broadcast_to_sessions(target_sessions, msg)
+    {:reply, [], state}
+  end
+
+  def handle_call({:dispatch, %MumbleProtocol.TextMessage{}}, {_from_pid, _from_self}, state) do
     {:reply, [], state}
   end
 
   def handle_call({:dispatch, message}, {from_pid, _from_ref}, state) do
-    Logger.debug("Unknown Message from `#{inspect from_pid}`: #{inspect message}")
+    Logger.debug("Unknown Message from `#{inspect(from_pid)}`: #{inspect(message)}")
     reply = MumbleProtocol.Reject.new(type: 0, reason: "Unknown Message")
     {:reply, [reply], state}
   end

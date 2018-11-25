@@ -31,14 +31,16 @@ defmodule Alpheidae.ChannelRegistry do
       parent_channel_id: -1,
       position: 0
     }
+
     :ets.insert(__MODULE__, {0, root})
 
     channels = Application.get_env(:alpheidae, :channels)
+
     for ch <- channels do
       base = %Channel{
         channel_id: :os.system_time(:seconds),
         parent_channel_id: 0,
-        position: 1,
+        position: 1
       }
 
       rec = Map.merge(base, ch)
@@ -73,24 +75,28 @@ defmodule Alpheidae.ChannelRegistry do
   end
 
   def handle_call({:all_channels}, _, state) do
-    channels = :ets.foldl(
-      fn {_, t}, acc ->
-        [channel_to_channel_state(t)] ++ acc
-      end,
-      [],
-      __MODULE__
-    )
+    channels =
+      :ets.foldl(
+        fn {_, t}, acc ->
+          [channel_to_channel_state(t)] ++ acc
+        end,
+        [],
+        __MODULE__
+      )
+
     {:reply, channels, state}
   end
 
   def handle_call({:all_channels_linked}, _, state) do
-    channels = :ets.foldl(
-      fn {_, t}, acc ->
-        [channel_to_channel_state_linked(t)] ++ acc
-      end,
-      [],
-      __MODULE__
-    )
+    channels =
+      :ets.foldl(
+        fn {_, t}, acc ->
+          [channel_to_channel_state_linked(t)] ++ acc
+        end,
+        [],
+        __MODULE__
+      )
+
     {:reply, channels, state}
   end
 
@@ -101,6 +107,7 @@ defmodule Alpheidae.ChannelRegistry do
       description: channel.description
     )
   end
+
   defp channel_to_channel_state_linked(channel) do
     MumbleProtocol.ChannelState.new(
       name: channel.name,

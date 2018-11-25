@@ -20,7 +20,7 @@ defmodule Alpheidae.Protocol do
     :ok = :ranch.accept_ack(ref)
 
     send_version(socket, transport)
-    transport.setopts(socket, [active: :once])
+    transport.setopts(socket, active: :once)
     loop(socket, transport, <<>>)
   end
 
@@ -29,16 +29,19 @@ defmodule Alpheidae.Protocol do
       {:ssl, ^socket, new_data} ->
         {messages, next_data} = MumbleProtocol.decode(old_data <> new_data)
         for message <- messages, do: handle_message(socket, transport, message)
-        transport.setopts(socket, [active: :once])
+        transport.setopts(socket, active: :once)
         loop(socket, transport, next_data)
+
       {:ssl_closed, ^socket} ->
         Alpheidae.ClientRegistry.deregister(self())
+
       {:message, message} ->
         packet = MumbleProtocol.encode(message)
         transport.send(socket, packet)
         loop(socket, transport, old_data)
+
       any ->
-        Logger.debug("Got unhandled message #{inspect any, pretty: true}")
+        Logger.debug("Got unhandled message #{inspect(any, pretty: true)}")
         loop(socket, transport, old_data)
     end
   end
@@ -53,6 +56,7 @@ defmodule Alpheidae.Protocol do
       case reply do
         %MumbleProtocol.Reject{} ->
           :ok = transport.close(socket)
+
         _any ->
           :ok
       end
@@ -60,9 +64,7 @@ defmodule Alpheidae.Protocol do
   end
 
   defp send_version(socket, transport) do
-    version = MumbleProtocol.Version.new(
-      version: 66067
-    )
+    version = MumbleProtocol.Version.new(version: 66067)
 
     packet = MumbleProtocol.encode(version)
     transport.send(socket, packet)

@@ -89,6 +89,14 @@ defmodule Alpheidae.ClientRegistry do
   end
 
   @doc """
+  Send a message to every client in a list of sessions
+  """
+  def broadcast_to_sessions(target_sessions, message) do
+    server_pid = :erlang.whereis(__MODULE__)
+    GenServer.call(server_pid, {:broadcast_to_sessions, target_sessions, message})
+  end
+
+  @doc """
   Update the registry state to match the sent client state
   """
   def update_client_state(client_pid, message) do
@@ -121,11 +129,12 @@ defmodule Alpheidae.ClientRegistry do
       self_deaf: false
     }
 
-    crypt_setup = MumbleProtocol.CryptSetup.new(
-      key: user.crypt_key,
-      client_nonce: user.client_nonce,
-      server_nonce: user.server_nonce
-    )
+    crypt_setup =
+      MumbleProtocol.CryptSetup.new(
+        key: user.crypt_key,
+        client_nonce: user.client_nonce,
+        server_nonce: user.server_nonce
+      )
 
     :ets.insert(__MODULE__, {client_pid, user})
     user_state = client_to_user_state(user)
@@ -144,34 +153,39 @@ defmodule Alpheidae.ClientRegistry do
 
   def handle_call({:record_ping, client_pid, ping_message}, _, state) do
     [{^client_pid, client}] = :ets.lookup(__MODULE__, client_pid)
+
     :ets.insert(
       __MODULE__,
-      {client_pid, %{client | last_ping_at: :os.system_time(:millisecond) }}
+      {client_pid, %{client | last_ping_at: :os.system_time(:millisecond)}}
     )
+
     server_ping = %MumbleProtocol.Ping{timestamp: ping_message.timestamp, good: 0}
     {:reply, {:ok, server_ping}, state}
   end
 
   def handle_call({:all_users}, _, state) do
-    users = :ets.foldl(
-      fn {_, t}, acc ->
-        [client_to_user_state(t)] ++ acc
-      end,
-      [],
-      __MODULE__
-    )
+    users =
+      :ets.foldl(
+        fn {_, t}, acc ->
+          [client_to_user_state(t)] ++ acc
+        end,
+        [],
+        __MODULE__
+      )
+
     {:reply, users, state}
   end
 
   def handle_call({:server_sync, client_pid}, _, state) do
     [{^client_pid, client}] = :ets.lookup(__MODULE__, client_pid)
 
-    sync = MumbleProtocol.ServerSync.new(
-      session: client.session,
-      max_bandwith: Application.get_env(:alpheidae, :max_bandwith),
-      welcome_text: Application.get_env(:alpheidae, :welcome_text),
-      permissions: client.permissions
-    )
+    sync =
+      MumbleProtocol.ServerSync.new(
+        session: client.session,
+        max_bandwith: Application.get_env(:alpheidae, :max_bandwith),
+        welcome_text: Application.get_env(:alpheidae, :welcome_text),
+        permissions: client.permissions
+      )
 
     {:reply, sync, state}
   end
@@ -183,7 +197,18 @@ defmodule Alpheidae.ClientRegistry do
 
   def handle_call({:broadcast_to_channel, client_pid, message}, _, state) do
     [{^client_pid, client}] = :ets.lookup(__MODULE__, client_pid)
-    fun = fn ({pid, c}, acc) -> if (client_pid == pid || c.channel_id != client.channel_id), do: acc, else: [pid] ++ acc end
+
+    fun = fn {pid, c}, acc ->
+      if client_pid == pid || c.channel_id != client.channel_id, do: acc, else: [pid] ++ acc
+    end
+
+    pids = :ets.foldl(fun, [], __MODULE__)
+    for pid <- pids, do: send(pid, {:message, message})
+    {:reply, :ok, state}
+  end
+
+  def handle_call({:broadcast_to_sessions, target_sessions, message}, _, state) do
+    fun = fn {pid, c}, acc -> if c.session in target_sessions, do: [pid] ++ acc, else: acc end
     pids = :ets.foldl(fun, [], __MODULE__)
     for pid <- pids, do: send(pid, {:message, message})
     {:reply, :ok, state}
@@ -198,25 +223,29 @@ defmodule Alpheidae.ClientRegistry do
       channel_id: message.channel_id
     }
 
-    new_client = Map.merge(
-      client,
-      allowed_updates,
-      fn _, v1, v2 -> if v2 == nil, do: v1, else: v2 end
-    )
+    new_client =
+      Map.merge(
+        client,
+        allowed_updates,
+        fn _, v1, v2 -> if v2 == nil, do: v1, else: v2 end
+      )
 
     cond do
       message.session == client.session ->
         :ets.insert(__MODULE__, {client_pid, new_client})
         base_state = client_to_user_state(new_client)
-        user_state = %{base_state| actor: client.session}
+        user_state = %{base_state | actor: client.session}
         broadcast_message(client_pid, user_state)
         send(client_pid, {:message, base_state})
+
       true ->
         case client_by_session(message.session) do
           [target] ->
             denial = client_to_user_state(target)
             send(client_pid, {:message, denial})
-          _ -> :noop
+
+          _ ->
+            :noop
         end
     end
 
@@ -238,13 +267,13 @@ defmodule Alpheidae.ClientRegistry do
   end
 
   defp broadcast_message(client_pid, message) do
-    fun = fn ({pid, _}, acc) -> if (client_pid == pid), do: acc, else: [pid] ++ acc end
+    fun = fn {pid, _}, acc -> if client_pid == pid, do: acc, else: [pid] ++ acc end
     pids = :ets.foldl(fun, [], __MODULE__)
     for pid <- pids, do: send(pid, {:message, message})
   end
 
   defp client_by_session(session) do
-    fun = fn ({_, c}, acc) -> if (c.session == session), do: [c] ++ acc, else: acc end
+    fun = fn {_, c}, acc -> if c.session == session, do: [c] ++ acc, else: acc end
     :ets.foldl(fun, [], __MODULE__)
   end
 end

@@ -33,7 +33,10 @@ defmodule Alpheidae.MixProject do
 
   defp aliases do
     [
-      dev_setup: ["cmd mkdir _keys", "cmd openssl req -x509 -newkey rsa:4096 -keyout _keys/key.pem -out _keys/cert.pem -days 365 -nodes -subj '/CN=localhost'"]
+      dev_setup: [
+        "cmd mkdir _keys",
+        "cmd openssl req -x509 -newkey rsa:4096 -keyout _keys/key.pem -out _keys/cert.pem -days 365 -nodes -subj '/CN=localhost'"
+      ]
     ]
   end
 end
