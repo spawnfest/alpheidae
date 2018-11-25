@@ -33,10 +33,11 @@ defmodule Alpheidae.VoiceServer do
     {:ok, crypt_setup} = Client.register_session(from_pid, auth)
 
     channels = Channel.all_channels()
+    channels_linked = Channel.all_channels_linked()
     users = Client.all_users()
     server_sync = Client.server_sync_for(from_pid)
 
-    payload = [crypt_setup] ++ channels ++ users ++ [server_sync]
+    payload = [crypt_setup] ++ channels ++ channels_linked ++ users ++ [server_sync]
 
     {:reply, payload, state}
   end
