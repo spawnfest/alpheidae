@@ -8,6 +8,8 @@ defmodule Alpheidae.RanchLink do
   """
   def start_link do
     options = Application.get_env(:alpheidae, :socket_options)
-    {:ok, _} = :ranch.start_listener(:alpheidae_listener, 100, :ranch_ssl, options, Alpheidae.Protocol, [])
+
+    {:ok, _} =
+      :ranch.start_listener(:alpheidae_listener, 100, :ranch_ssl, options, Alpheidae.Protocol, [])
   end
 end
