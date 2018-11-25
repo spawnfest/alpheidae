@@ -23,3 +23,5 @@ erl_crash.dump
 alpheidae-*.tar
 
 /_keys/
+
+/.elixir_ls
