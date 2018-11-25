@@ -67,6 +67,31 @@ defmodule Alpheidae.VoiceServer do
     {:reply, [], state}
   end
 
+  def handle_call({:dispatch, %MumbleProtocol.ACL{} = acl}, {from_pid, _from_self}, state) do
+    reply = MumbleProtocol.ACL.new(channel_id: acl.channel_id)
+    send(from_pid, {:message, reply})
+    {:reply, [], state}
+  end
+
+  def handle_call({:dispatch, %MumbleProtocol.ChannelState{}}, {from_pid, _from_self}, state) do
+    session = Client.session_for(from_pid)
+    reply = MumbleProtocol.PermissionDenied.new(deny_type: 11, session: session)
+    send(from_pid, {:message, reply})
+    {:reply, [], state}
+  end
+
+  def handle_call({:dispatch, %MumbleProtocol.ChannelRemove{}}, {from_pid, _from_self}, state) do
+    session = Client.session_for(from_pid)
+    reply = MumbleProtocol.PermissionDenied.new(deny_type: 11, session: session)
+    send(from_pid, {:message, reply})
+    {:reply, [], state}
+  end
+
+  def handle_call({:dispatch, %MumbleProtocol.UserStats{} = stats}, {from_pid, _from_self}, state) do
+    send(from_pid, {:message, stats})
+    {:reply, [], state}
+  end
+
   def handle_call({:dispatch, message}, {from_pid, _from_ref}, state) do
     Logger.debug("Unknown Message from `#{inspect from_pid}`: #{inspect message}")
     reply = MumbleProtocol.Reject.new(type: 0, reason: "Unknown Message")
