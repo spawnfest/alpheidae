@@ -6,3 +6,7 @@ A mumble server written in Elixir.
 ## Setup
 
     $ mix dev_setup
+
+## Useful Reading
+
+* [Mumble 1.2.5-alpha Protocol spec](https://media.readthedocs.org/pdf/mumble-protocol/latest/mumble-protocol.pdf)
