@@ -55,7 +55,8 @@ defmodule Alpheidae.VoiceServer do
     {:reply, [server_ping], state}
   end
 
-  def handle_call({:dispatch, %MumbleProtocol.UserState{} = user_state}, _, state) do
+  def handle_call({:dispatch, %MumbleProtocol.UserState{} = user_state}, {from_pid, _from_ref}, state) do
+    Client.update_client_state(from_pid, user_state)
     {:reply, [user_state], state}
   end
 

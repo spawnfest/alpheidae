@@ -12,7 +12,9 @@ defmodule Alpheidae.ClientRegistry do
       :client_nonce,
       :server_nonce,
       :channel_id,
-      :permissions
+      :permissions,
+      :self_mute,
+      :self_deaf
     ]
   end
 
@@ -86,6 +88,14 @@ defmodule Alpheidae.ClientRegistry do
     GenServer.call(server_pid, {:broadcast_to_channel, client_pid, message})
   end
 
+  @doc """
+  Update the registry state to match the sent client state
+  """
+  def update_client_state(client_pid, message) do
+    server_pid = :erlang.whereis(__MODULE__)
+    GenServer.call(server_pid, {:update_client_state, client_pid, message})
+  end
+
   def start_link(opts) do
     GenServer.start_link(__MODULE__, :ok, opts)
   end
@@ -106,7 +116,9 @@ defmodule Alpheidae.ClientRegistry do
       server_nonce: <<0::128>>,
       channel_id: 0,
       last_ping_at: :os.system_time(:millisecond),
-      permissions: 0xf07ff
+      permissions: 0xC,
+      self_mute: false,
+      self_deaf: false
     }
 
     crypt_setup = MumbleProtocol.CryptSetup.new(
@@ -179,6 +191,26 @@ defmodule Alpheidae.ClientRegistry do
     {:reply, :ok, state}
   end
 
+  def handle_call({:update_client_state, client_pid, message}, _, state) do
+    [{^client_pid, client}] = :ets.lookup(__MODULE__, client_pid)
+
+    allowed_updates = %{
+      self_mute: message.self_mute,
+      self_deaf: message.self_deaf,
+      channel_id: message.channel_id
+    }
+
+    new_client = Map.merge(client, allowed_updates, fn _, v1, v2 -> if v2 == nil, do: v1, else: v2 end)
+    :ets.insert(__MODULE__, {client_pid, new_client})
+
+    base_state = client_to_user_state(new_client)
+    user_state = %{base_state| actor: new_client.session}
+    broadcast_message(client_pid, user_state)
+    send(client_pid, {:message, message})
+
+    {:reply, :ok, state}
+  end
+
   def handle_call(_, _, state) do
     {:reply, :ok, state}
   end
@@ -187,7 +219,9 @@ defmodule Alpheidae.ClientRegistry do
     MumbleProtocol.UserState.new(
       name: client.name,
       session: client.session,
-      channel_id: client.channel_id
+      channel_id: client.channel_id,
+      self_mute: client.self_mute,
+      self_deaf: client.self_deaf
     )
   end
 
