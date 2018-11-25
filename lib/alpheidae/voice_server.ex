@@ -59,9 +59,10 @@ defmodule Alpheidae.VoiceServer do
     {:reply, [user_state], state}
   end
 
-  def handle_call({:dispatch, %MumbleProtocol.VoicePacket{} = packet}, {from_pid, _from_self}, state) do
-    Logger.debug("#{inspect packet}")
-    Client.broadcast(from_pid, packet, false)
+  def handle_call({:dispatch, %MumbleProtocol.VoicePacket{} = client_output}, {from_pid, _from_self}, state) do
+    session = Client.session_for(from_pid)
+    client_input = %{client_output | session: session}
+    Client.broadcast_to_channel(from_pid, client_input)
     {:reply, [], state}
   end
 

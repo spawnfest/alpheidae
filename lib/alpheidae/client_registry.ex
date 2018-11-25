@@ -73,9 +73,17 @@ defmodule Alpheidae.ClientRegistry do
   @doc """
   Send a message to every client in the registry.
   """
-  def broadcast(client_pid, message, send_to_self) do
+  def broadcast(client_pid, message) do
     server_pid = :erlang.whereis(__MODULE__)
-    GenServer.call(server_pid, {:broadcast, client_pid, message, send_to_self})
+    GenServer.call(server_pid, {:broadcast, client_pid, message})
+  end
+
+  @doc """
+  Send a message to every client in the channel that the client is in.
+  """
+  def broadcast_to_channel(client_pid, message) do
+    server_pid = :erlang.whereis(__MODULE__)
+    GenServer.call(server_pid, {:broadcast_to_channel, client_pid, message})
   end
 
   def start_link(opts) do
@@ -158,8 +166,16 @@ defmodule Alpheidae.ClientRegistry do
     {:reply, sync, state}
   end
 
-  def handle_call({:broadcast, client_pid, message, include_self}, _, state) do
+  def handle_call({:broadcast, client_pid, message}, _, state) do
     broadcast_message(client_pid, message)
+    {:reply, :ok, state}
+  end
+
+  def handle_call({:broadcast_to_channel, client_pid, message}, _, state) do
+    [{^client_pid, client}] = :ets.lookup(__MODULE__, client_pid)
+    fun = fn ({pid, c}, acc) -> if (client_pid == pid || c.channel_id != client.channel_id), do: acc, else: [pid] ++ acc end
+    pids = :ets.foldl(fun, [], __MODULE__)
+    for pid <- pids, do: send(pid, {:message, message})
     {:reply, :ok, state}
   end
 

@@ -7,4 +7,28 @@ defmodule MumbleProtocolTest do
     {[decoded], <<>>} = MumbleProtocol.decode(encoded)
     assert msg == decoded
   end
+
+  test ".encode_varint: 7-bit number" do
+    assert <<16>> == MumbleProtocol.encode_varint(16)
+  end
+
+  test ".encode_varint: 14-bit number" do
+    assert <<129, 44>> == MumbleProtocol.encode_varint(300)
+  end
+
+  test ".encode_varint: 21-bit number" do
+    assert <<209, 148, 107>> == MumbleProtocol.encode_varint(1152107)
+  end
+
+  test ".encode_varint: 28-bit number" do
+    assert <<224, 32, 0, 19>> == MumbleProtocol.encode_varint(2097171)
+  end
+
+  test ".encode_varint: 32-bit number" do
+    assert <<240, 16, 0, 0, 29>> == MumbleProtocol.encode_varint(268435485)
+  end
+
+  test ".encode_varint: 64-bit number" do
+    assert <<244, 0, 0, 0, 1, 0, 0, 0, 29>> == MumbleProtocol.encode_varint(4294967325)
+  end
 end
