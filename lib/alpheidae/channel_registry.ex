@@ -27,28 +27,24 @@ defmodule Alpheidae.ChannelRegistry do
 
     root = %Channel{
       channel_id: 0,
-      name: "root",
+      name: "Root",
       parent_channel_id: -1,
-      description: "Starting somewhere.",
-      position: 0,
+      position: 0
     }
     :ets.insert(__MODULE__, {0, root})
-    chan1 = %Channel{
-      channel_id: 1,
-      name: "chan1",
-      parent_channel_id: 0,
-      description: "test channel 1",
-      position: 2
-    }
-    :ets.insert(__MODULE__, {1, chan1})
-    chan2 = %Channel{
-      channel_id: 2,
-      name: "chan2",
-      parent_channel_id: 0,
-      description: "test channel 2",
-      position: 1
-    }
-    :ets.insert(__MODULE__, {2, chan2})
+
+    channels = Application.get_env(:alpheidae, :channels)
+    for ch <- channels do
+      base = %Channel{
+        channel_id: :os.system_time(:seconds),
+        parent_channel_id: 0,
+        position: 1,
+      }
+
+      rec = Map.merge(base, ch)
+      :ets.insert(__MODULE__, {rec.channel_id, rec})
+    end
+
     {:ok, %State{}}
   end
 
