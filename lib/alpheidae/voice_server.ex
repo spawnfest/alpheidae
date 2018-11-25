@@ -55,13 +55,40 @@ defmodule Alpheidae.VoiceServer do
     {:reply, [server_ping], state}
   end
 
-  def handle_call({:dispatch, %MumbleProtocol.UserState{} = user_state}, _, state) do
+  def handle_call({:dispatch, %MumbleProtocol.UserState{} = user_state}, {from_pid, _from_ref}, state) do
+    Client.update_client_state(from_pid, user_state)
     {:reply, [user_state], state}
   end
 
-  def handle_call({:dispatch, %MumbleProtocol.VoicePacket{} = packet}, {from_pid, _from_self}, state) do
-    Logger.debug("#{inspect packet}")
-    Client.broadcast(from_pid, packet, false)
+  def handle_call({:dispatch, %MumbleProtocol.VoicePacket{} = client_output}, {from_pid, _from_self}, state) do
+    session = Client.session_for(from_pid)
+    client_input = %{client_output | session: session}
+    Client.broadcast_to_channel(from_pid, client_input)
+    {:reply, [], state}
+  end
+
+  def handle_call({:dispatch, %MumbleProtocol.ACL{} = acl}, {from_pid, _from_self}, state) do
+    reply = MumbleProtocol.ACL.new(channel_id: acl.channel_id)
+    send(from_pid, {:message, reply})
+    {:reply, [], state}
+  end
+
+  def handle_call({:dispatch, %MumbleProtocol.ChannelState{}}, {from_pid, _from_self}, state) do
+    session = Client.session_for(from_pid)
+    reply = MumbleProtocol.PermissionDenied.new(deny_type: 11, session: session)
+    send(from_pid, {:message, reply})
+    {:reply, [], state}
+  end
+
+  def handle_call({:dispatch, %MumbleProtocol.ChannelRemove{}}, {from_pid, _from_self}, state) do
+    session = Client.session_for(from_pid)
+    reply = MumbleProtocol.PermissionDenied.new(deny_type: 11, session: session)
+    send(from_pid, {:message, reply})
+    {:reply, [], state}
+  end
+
+  def handle_call({:dispatch, %MumbleProtocol.UserStats{} = stats}, {from_pid, _from_self}, state) do
+    send(from_pid, {:message, stats})
     {:reply, [], state}
   end
 

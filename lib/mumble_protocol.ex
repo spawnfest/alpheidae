@@ -33,7 +33,7 @@ defmodule MumbleProtocol do
 
   defmodule VoicePacket do
     @moduledoc false
-    defstruct [:data, :target, :type]
+    defstruct [:data, :target, :type, :session, :sequence]
   end
 
   @doc """
@@ -56,11 +56,13 @@ defmodule MumbleProtocol do
   end
 
   # Handle the voice packets differently than the regular ones
-  defp decode_one(1, data) do
-    <<header :: signed-big-integer-size(8), _ :: binary>> = data
+  defp decode_one(1, buf) do
+    <<header :: signed-big-integer-size(8), message :: binary>> = buf
+
     target = band(0b00011111, header)
-    type = band(0b11100000, header)
-    %MumbleProtocol.VoicePacket{data: data, target: target, type: type}
+    type = band(0b11100000, header) >>> 5
+
+    %MumbleProtocol.VoicePacket{data: message, target: target, type: type}
   end
 
   defp decode_one(type, data) do
@@ -68,11 +70,35 @@ defmodule MumbleProtocol do
   end
 
   @doc """
+  Encodes a Mumble format varint
+  """
+  def encode_varint(int) do
+    cond do
+      int <= 0x7F ->
+        << int :: 8 >>
+      int <= 0x3FFF ->
+        << (((int >>> 8) &&& 0x3F) ||| 0x80) :: 8, (int &&& 0xFF) :: 8 >>
+      int <= 0x1FFFFF ->
+        << (((int >>> 16) &&& 0x1F) ||| 0xC0) :: 8, ((int >>> 8) &&& 0xFF) :: 8, (int &&& 0xFF) :: 8 >>
+      int <= 0xFFFFFFF ->
+        << (((int >>> 24) &&& 0xF) ||| 0xE0) :: 8, ((int >>> 16) &&& 0xFF) :: 8, ((int >>> 8) &&& 0xFF) :: 8, (int &&& 0xFF) :: 8 >>
+      int <= 0xFFFFFFFF ->
+        << 0xF0, int :: 32 >>
+      true ->
+        << 0xF4, int :: 64 >>
+    end
+  end
+
+  @doc """
   Encodes a struct as binary with the approprate header for the mumble client
   """
   # Hande voice differently
   def encode(%MumbleProtocol.VoicePacket{} = struct) do
-    <<1 :: signed-big-integer-size(16), byte_size(struct.data) :: signed-big-integer-size(32)>> <> struct.data
+    header = struct.type <<< 5 + struct.target
+    session = encode_varint(struct.session)
+    payload = <<header :: 8>> <> session <> struct.data
+
+    <<1 :: signed-big-integer-size(16), byte_size(payload) :: signed-big-integer-size(32)>> <> payload
   end
 
   def encode(struct) do
