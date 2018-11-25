@@ -10,3 +10,4 @@ A mumble server written in Elixir.
 ## Useful Reading
 
 * [Mumble 1.2.5-alpha Protocol spec](https://media.readthedocs.org/pdf/mumble-protocol/latest/mumble-protocol.pdf)
+* [Mumble/Murmur source](https://github.com/mumble-voip/mumble)
