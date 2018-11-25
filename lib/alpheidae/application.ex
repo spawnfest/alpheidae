@@ -7,6 +7,7 @@ defmodule Alpheidae.Application do
     import Supervisor.Spec, warn: false
 
     children = [
+      {Alpheidae.ChannelRegistry, [name: Alpheidae.ChannelRegistry]},
       {Alpheidae.ClientRegistry, [name: Alpheidae.ClientRegistry]},
       {Alpheidae.VoiceServer, [name: Alpheidae.VoiceServer]},
       worker(Alpheidae.RanchLink, [])

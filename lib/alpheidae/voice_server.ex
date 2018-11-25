@@ -2,6 +2,7 @@ defmodule Alpheidae.VoiceServer do
   use GenServer
   require Logger
   alias Alpheidae.ClientRegistry, as: Client
+  alias Alpheidae.ChannelRegistry, as: Channel
 
   @doc """
   Process a message from the mumble wire protocol
@@ -31,15 +32,12 @@ defmodule Alpheidae.VoiceServer do
   def handle_call({:dispatch, %MumbleProtocol.Authenticate{} = auth}, {from_pid, _from_ref}, state) do
     {:ok, crypt_setup} = Client.register_session(from_pid, auth)
 
-    root_channel = MumbleProtocol.ChannelState.new(
-      channel_id: 0,
-      name: "Tmp Root Ch"
-    )
-
+    channels = Channel.all_channels()
+    channels_linked = Channel.all_channels_linked()
     users = Client.all_users()
     server_sync = Client.server_sync_for(from_pid)
 
-    payload = [crypt_setup, root_channel] ++ users ++ [server_sync]
+    payload = [crypt_setup] ++ channels ++ channels_linked ++ users ++ [server_sync]
 
     {:reply, payload, state}
   end
